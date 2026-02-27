@@ -32,6 +32,7 @@ import qupath.lib.analysis.DelaunayTools
 import qupath.lib.objects.PathObjects
 import qupath.ext.stardist.StarDist2D
 import qupath.lib.scripting.QP
+import qupath.lib.roi.GeometryTools
 
 ////////////////////////////////////////////////////////////////
 
@@ -202,8 +203,7 @@ empty_anno = getAnnotationObjects().findAll{it.nDescendants()!=1}
 removeObjects(empty_anno)
 
 
-// Classify detections to cells
-// Make cells
+// Make the detections to new cells 
 getAnnotationObjects().each{anno -> anno.setName(anno.getID().toString())} //make IDs annotation names
 
 def detections = getDetectionObjects()
@@ -214,8 +214,14 @@ for (nucleus in detections) {
     cytoplasm = getAnnotationObjects().findAll{it.getName()==parent_ID}  
     
     //Has cytoplasm been found? If so, make a cell
-    if (cytoplasm.size()>0){
-        cell = PathObjects.createCellObject(cytoplasm[0].getROI(), nucleus.getROI(), null) //Set cell nucleus, cytoplasm and parent        
+    if (cytoplasm.size()>0) {
+        // Modify the cytoplasm geom to ensure it fully contains its associated nucleus
+        cytoplasm_geom = cytoplasm[0].getROI().getGeometry()
+        nucleus_geom = nucleus.getROI().getGeometry()
+        cell_full_geom = cytoplasm_geom.union(nucleus_geom)
+        cell_full_ROI = GeometryTools.geometryToROI(cell_full_geom, plane)
+        
+        cell = PathObjects.createCellObject(cell_full_ROI, nucleus.getROI(), null) //Set cell nucleus, cytoplasm and parent        
         addObjects(cell)
         removeObjects(nucleus)
         removeObjects(cytoplasm)
