@@ -11,14 +11,16 @@
  * For Alex Mellor, Kate Ellacott lab, University of Exeter
  */
  
-run("Fresh Start");
 
 /////////////////////////////////////////////////////////////////
 //////////// STEP 1 - FIND FILE PATHS ///////////////////////////
 
-dataset_dir = getDirectory("Choose a Directory ");  
-files = listFiles(dataset_dir);  //get full file paths
+//dataset_dir = getDirectory("Choose a Directory ");  
+#@ File (label="Choose dataset directory", style = "directory") dataset_dir
+#@ Boolean (label="Run in background?") background_selection
 
+setBatchMode(background_selection); 
+files = listFiles(dataset_dir);  //get full file paths
 
 // Get dirs containing both a tiff and roi zip. 
 // Make list of dirs containing rois or images, then compare. Keep the overlapwith both files
@@ -36,40 +38,94 @@ for (i = 0; i < files.length; i++) {
 
 cell_dirs = getOverlap(roi_dir_list, cell_img_dir_list);
 
+print(dataset_dir);
+Array.show(getFileList(dataset_dir));
+print(files.length);
+print(cell_dirs.length + " cells found"); 
+
 
 /////////////////////////////////////////////////////////////////
-//////////// STEP 2 - OPEN FILES AND ROIS ///////////////////////
+//////////// STEP 2 - OPEN FILES AND RUN SHOLL //////////////////
 
-// Open image and ROIs
-img_path = cell_dirs[1] + "cell_img.tiff"
-roi_path = cell_dirs[1] + "rois.zip"
-open(img_path);
-roiManager("open", roi_path);
+// Set colour variables
+run("Colors...", "foreground=white background=black selection=orange");
+setBackgroundColor(0, 0, 0);
+setForegroundColor(255, 255, 255);
 
 
-// Make masks for Sholl
-width = getWidth();
-height = getHeight();
+// Loop through files
+for (i = 0; i < cell_dirs.length; i++) {
+	
+	run("Fresh Start");
+	roiManager("reset");
+	
+	// Open image and ROIs
+	img_path = cell_dirs[i] + "cell_img.tiff";
+	roi_path = cell_dirs[i] + "rois.zip";
+	open(img_path);
+	roiManager("open", roi_path);
+	
+	
+	// Make masks for Sholl
+	selectWindow("cell_img.tiff");	
+	width = getWidth();
+	height = getHeight();
+	
+	// Remove ROIs > index 2
+	if (roiManager("count")>2){
+		for (j = 2; j < roiManager("count"); j++) {
+			roiManager("select", j);
+    		roiManager("delete");
+		}
+	}
+	
+	newImage("cell_mask", "8-bit black", width, height, 1);
+	roiManager("Select", 0);
+	run("Fill");
+	run("Select None");
+	
+//	newImage("nucleus_mask", "8-bit", width, height, 1);
+//	roiManager("Select", 1);
+//	run("Fill");
+//	run("Select None");
+	
+	
+	// Make cell skeleton for Sholl
+	selectWindow("cell_mask");
+	run("Skeletonize");
+	rename("cell_skeleton");
+	
+	selectImage("cell_skeleton"); 
+	run("Create Selection");
+	roiManager("Add");  // Add to ROI Manager
+	run("Select None");
 
-newImage("cell_mask", "8-bit", width, height, 1);
-roiManager("Select", 0);
-run("Clear Outside");
-run("Select None");
+	selectImage("cell_skeleton");
+	roiManager("select", 0); // This will set the cell ROI centroid as the centre-point for Sholl rings
+	
 
-newImage("nucleus_mask", "8-bit", width, height, 1);
-roiManager("Select", 1);
-run("Clear Outside");
-run("Select None");
+	// Run Sholl:	
+	// NB: have a look at the example scripts in Templates>Neuroanatomy> for more
+	// robust ways to automate Sholl. E.g., Sholl_Extract_Profile_From_Image_Demo.py
+	// exemplifies how to parse an image programmatically using API calls
+	run("Sholl Analysis (From Image)...", "datamodechoice=Intersections startradius=0.0 stepsize=10.0 endradius=52.79549876399019 hemishellchoice=[None. Use full shells] previewshells=false nspans=1 nspansintchoice=N/A primarybrancheschoice=[Infer from starting radius] primarybranches=0 polynomialchoice=['Best fitting' degree] polynomialdegree=0 normalizationmethoddescription=[Automatically choose] normalizerdescription=Default plotoutputdescription=[Linear plot] tableoutputdescription=[Detailed table] annotationsdescription=[ROIs (points and 2D shells)] lutchoice=mpl-viridis.lut luttable=net.imglib2.display.ColorTable8@61827ed3 save=true savedir=["+cell_dirs[i]+"] analysisaction=[Analyze image]");
+	
 
-// Make cell skeleton for Sholl
-selectWindow("cell_mask");
-run("Skeletonize");
+	// Save and close
+	saveAs("tiff", cell_dirs[i]+"skeleton.tiff");  // save skeleton img
+	roiManager("save", roi_path);  // Save ROI Manager with skeleton ROI
+	close("*");
+		
+	print("Processed cell " + (i+1) + "of " + cell_dirs.length);
+}
+
 
 /////////////////////////////////////////////////////////////////
 //////////// FUNCTIONS //////////////////////////////////////////
 
 // Get an array of files recrsively identified from a dir
 function listFiles(dir) {
+    dir = dir + File.separator;
     output_list = newArray();
     list = getFileList(dir);
 
