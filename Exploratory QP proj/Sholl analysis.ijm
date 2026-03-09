@@ -17,7 +17,9 @@
 
 //dataset_dir = getDirectory("Choose a Directory ");  
 #@ File (label="Choose dataset directory", style = "directory") dataset_dir
+#@ Boolean (label="Stamp overlay on sholl image?") stamp_overlay  // Creates additional RGB image with sholl rings stamped on skeleton
 #@ Boolean (label="Run in background?") background_selection
+
 
 setBatchMode(background_selection); 
 files = listFiles(dataset_dir);  //get full file paths
@@ -104,19 +106,53 @@ for (i = 0; i < cell_dirs.length; i++) {
 	roiManager("select", 0); // This will set the cell ROI centroid as the centre-point for Sholl rings
 	
 
+	// Remove existing files if they exist
+	current_files = getFileList(cell_dirs[i]);
+	for (j = 0; j < current_files.length; j++) {
+		file = current_files[j];
+		print(file);
+		if(indexOf(file, "keleton") != -1){
+			exit("ERROR: existing analysis files in folder "+cell_dirs[i]+" must remove to continue\n(NB. contain \"skeleton\" in name");
+		}
+	}
+	
+	
+
+
 	// Run Sholl:	
 	// NB: have a look at the example scripts in Templates>Neuroanatomy> for more
 	// robust ways to automate Sholl. E.g., Sholl_Extract_Profile_From_Image_Demo.py
 	// exemplifies how to parse an image programmatically using API calls
-	run("Sholl Analysis (From Image)...", "datamodechoice=Intersections startradius=0.0 stepsize=10.0 endradius=52.79549876399019 hemishellchoice=[None. Use full shells] previewshells=false nspans=1 nspansintchoice=N/A primarybrancheschoice=[Infer from starting radius] primarybranches=0 polynomialchoice=['Best fitting' degree] polynomialdegree=0 normalizationmethoddescription=[Automatically choose] normalizerdescription=Default plotoutputdescription=[Linear plot] tableoutputdescription=[Detailed table] annotationsdescription=[ROIs (points and 2D shells)] lutchoice=mpl-viridis.lut luttable=net.imglib2.display.ColorTable8@61827ed3 save=true savedir=["+cell_dirs[i]+"] analysisaction=[Analyze image]");
-	
 
-	// Save and close
-	saveAs("tiff", cell_dirs[i]+"skeleton.tiff");  // save skeleton img
-	roiManager("save", roi_path);  // Save ROI Manager with skeleton ROI
+	// Saving withing plugin
+	selectWindow("cell_skeleton");
+	
+	run("Sholl Analysis (From Image)...", "datamodechoice=Intersections startradius=0.0 stepsize=10.0 endradius=52.79549876399019 hemishellchoice=[None. Use full shells] previewshells=false nspans=1 nspansintchoice=N/A primarybrancheschoice=[Infer from starting radius] primarybranches=0 polynomialchoice=['Best fitting' degree] polynomialdegree=0 normalizationmethoddescription=[Automatically choose] normalizerdescription=Default plotoutputdescription=[Linear plot] tableoutputdescription=[Detailed table] annotationsdescription=[ROIs (points and 2D shells)] lutchoice=mpl-viridis.lut luttable=net.imglib2.display.ColorTable8@61827ed3 save=true savedir=["+cell_dirs[i]+"] analysisaction=[Analyze image]");
+
+	
+	// Save and close	
+	if (stamp_overlay){
+		selectImage("cell_skeleton");
+		run("Duplicate...", "title=cell_skeleton_stamped");
+		run("Flatten");
+		run("RGB Color");
+		saveAs("tiff", cell_dirs[i]+"skeleton_sholl_overlay_stamped.tiff");  // save skeleton img with sholl overlay stamped
+		close();
+	}
+		
+		
+	selectImage("cell_skeleton");
+	saveAs("tiff", cell_dirs[i]+"skeleton with overlay.tiff");  // save skeleton img
+	
+	
+	roiManager("select", 0);roiManager("rename", "cell");
+	roiManager("select", 1);roiManager("rename", "nucleus");
+	roiManager("select", 2);roiManager("rename", "skeleton");
+	roiManager("save", roi_path);  // Save ROI Manager with skeleton ROI and naming for others
 	close("*");
 		
 	print("Processed cell " + (i+1) + "of " + cell_dirs.length);
+	
 }
 
 
