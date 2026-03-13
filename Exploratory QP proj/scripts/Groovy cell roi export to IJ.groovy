@@ -21,11 +21,11 @@ import ij.io.FileSaver
 // Set image constants
 def viewer = QPEx.getCurrentViewer()
 def server = viewer.getImageData().getServer()
-
+cell_counter = 1  // Initialise counter used for naming
 
 // Loop through cell detections
 getCellObjects().each{anno ->
-   
+       
     // Get cell shape data
     cellRoi = anno.getROI()
     annoX = cellRoi.boundsX
@@ -45,7 +45,7 @@ getCellObjects().each{anno ->
     }
     
     RoiManager roiMan = RoiManager.getRoiManager() 
-    roiMan.setVisible(true)
+    // roiMan.setVisible(true)
     roiMan.reset()
     
     // Add cell ROI
@@ -64,11 +64,13 @@ getCellObjects().each{anno ->
     roiMan.addRoi(nucRoiIJ)
           
     // Save and close
-    def cell_ID = anno.getID().toString()
+    def cell_name = "cell_" + cell_counter.toString()
     def pathExportForSholl = buildFilePath(PROJECT_BASE_DIR, 'exported_for_sholl')
     def imageName = getCurrentImageData().getServer().getMetadata().getName()
-    def cellExportPath = buildFilePath(pathExportForSholl, imageName, "cell_"+cell_ID)
+    def cellExportPath = buildFilePath(pathExportForSholl, imageName, cell_name)
     mkdirs(cellExportPath) // make a dir for the cell data
+    
+    anno.setName(cell_name) // Add cell counter as the cell's "name" for reference
     
     def roiFilePath = buildFilePath(cellExportPath, 'rois.zip')
     def imgFilePath = buildFilePath(cellExportPath, 'cell_img.tiff')
@@ -79,6 +81,11 @@ getCellObjects().each{anno ->
     FileSaver fs = new FileSaver(imp)
     fs.saveAsTiff(imgFilePath)
     imp.close()
+    
+    println "cell " + cell_name + " processed"
+    cell_counter += 1
     }
 
 println('Done!')
+
+
