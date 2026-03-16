@@ -1,0 +1,104 @@
+---
+title: "Sholl analysis consolidation"
+author: "James Crichton"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Sholl analysis 
+
+This is an R-markdown script to consolidate, visualise and analyse data generate by sholl analysis (ImageJ) of imaged segmented from brain tissue sections using QuPath.
+
+## Step 1: read in data
+
+User must define the input directory containing the image data. This should be generated from previous scripts, and posess the title "exported for sholl/". Subdirectories will be 1) Image name; 2) cell name.
+
+Everything else beyond this cell should be automated and require no direct user input.
+
+```{r data input, include=FALSE}
+
+# User should input the QuPath project's "exported_for_sholl" directory, generated in earlier steps of the analysis
+dir <- "Q:/Kate Ellacott Lab/Alex Mellor/JC Analysis Support/Exploratory QP proj/exported_for_sholl" 
+
+```
+
+```{r dependencies, echo=FALSE}
+
+# Load libraries
+library(tidyverse)
+
+
+# Consolidate data into a single df
+df_joined <- data.frame()
+
+all_files <- list.files(path = dir, recursive = TRUE, full.names = TRUE)
+csv_files <- all_files[grepl("\\.csv$", all_files)]
+
+counter = 1
+
+for(path in csv_files){
+  path_levels <- strsplit(path, .Platform$file.sep)[[1]]
+  
+  cell_df <- read.csv(path)
+  cell_df$cell <- path_levels[length(path_levels)-1]
+  cell_df$img <- path_levels[length(path_levels)-2]
+  cell_df <- cell_df %>% select(!X.)  # Drop this empty col
+
+  df_joined <- bind_rows(df_joined, cell_df)
+
+  # print(paste(counter, "of", length(csv_files), "complete", sep=" "))
+  # counter = counter + 1
+}
+```
+
+## Plot data
+
+```{r}
+
+# Plot data from all cells
+rad_int_all_lineplot <- ggplot(df_joined)+
+  geom_line(aes(x=Radius, y=Inters., col=cell))+
+  ggtitle("All cells") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+rad_int_all_lineplot
+
+
+# Plot log.Inters..Area. data agains radius, after filtering for empty rings
+rad_logintarea_all_lineplot <- 
+  df_joined %>% 
+    filter(log.Inters..Area.!=0) %>%  # Filter zero values (no intersections) as these are not meaningful)
+    ggplot()+
+      geom_line(aes(x=Radius, y=log.Inters..Area., col=cell))+
+      ggtitle("All cells") +
+      theme(plot.title = element_text(hjust = 0.5))
+
+rad_logintarea_all_lineplot
+
+
+# Pooled data with sd shown in the opaque area behind line
+pooled_sholl_plot <-  df_joined %>% 
+    filter(log.Inters..Area.!=0) %>%  # Filter zero values (no intersections) as these are not meaningful) %>%
+    group_by(Radius, img) %>%
+    summarise(intersections_mean = mean(Inters.), 
+              intersections_sd = sd(Inters.)) %>%
+    mutate(sd_upper = intersections_mean+intersections_sd, 
+           sd_lower = intersections_mean-intersections_sd) %>%
+    ungroup() %>%
+    ggplot(aes(x=Radius, y=intersections_mean))+
+      geom_line()+
+      geom_ribbon(aes(ymin=sd_lower, 
+                      ymax=sd_upper),
+                  fill = "blue", alpha = 0.2)+
+      ggtitle("Pooled sholl analysis results\nBlue ribbon = st dev") +
+      theme(plot.title = element_text(hjust = 0.5))+
+  xlab("Radius from centroid (px)")+
+  ylab("Mean intersections")
+    
+pooled_sholl_plot
+    
+```
