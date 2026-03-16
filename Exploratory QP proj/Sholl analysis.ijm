@@ -81,20 +81,21 @@ for (i = 0; i < cell_dirs.length; i++) {
 		}
 	}
 	
+	
+	// Make cell mask
 	newImage("cell_mask", "8-bit black", width, height, 1);
 	roiManager("Select", 0);
 	run("Fill");
+	// Removing anomolies in mask
+	run("Fill Holes");  
+	run("Dilate");
+	run("Erode");
 	run("Select None");
-	
-//	newImage("nucleus_mask", "8-bit", width, height, 1);
-//	roiManager("Select", 1);
-//	run("Fill");
-//	run("Select None");
 	
 	
 	// Make cell skeleton for Sholl
 	selectWindow("cell_mask");
-	run("Skeletonize");
+	run("Skeletonize (2D/3D)");
 	rename("cell_skeleton");
 	
 	selectImage("cell_skeleton"); 
