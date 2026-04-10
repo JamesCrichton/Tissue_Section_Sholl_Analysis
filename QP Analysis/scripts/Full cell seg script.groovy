@@ -6,10 +6,9 @@ This involves three main steps:
 3. Splitting of the cell body mask using associated nuclei as seeds, to generate cell objects 
 
 Requires:
-StarDist QuPath Extension
-StarDist model (https://github.com/qupath/models/tree/main/stardist)
+Cellpose extension
         
-James Crichton, RILD  Bioimaging, University of Exeter
+Author: James Crichton, RILD  Bioimaging, University of Exeter
 Written for Alex Mellor, Kate Ellacott lab, University of Exeter
 '''
 
@@ -159,7 +158,7 @@ removeObjects(non_cell_annotations)
 // Make a function to split the cell body of any names cell class
 def cell_split(CELL_CLASS){
 '''
-Function will split a objects with the named classification, using a Voronoi diagram with segmented nuclei as the seed points. 
+Function will split objects with the named classification, using a Voronoi diagram with segmented nuclei as the seed points. 
 Remaining objects will become defined as cell bodies. 
 The purpose of this is to separate merged cells. 
 
@@ -193,10 +192,9 @@ CELL_CLASS = str. Name of the annotation class being split.
     
     // Create Voronoi annotations, limit the expansion and set the class of its origin annotation
     voronoiDiagram = voronoiDiagram.collectEntries { annotationObj, voronoiFace ->
-        objClass = annotationObj.getPathClass()
         intersect = voronoiFace.intersection(referenceGeom)
         roi = GeometryTools.geometryToROI(intersect, plane)
-        [(annotationObj): PathObjects.createAnnotationObject(roi,objClass)]
+        [(annotationObj): PathObjects.createAnnotationObject(roi, getPathClass(CELL_CLASS))]
     } 
     
     
@@ -228,21 +226,27 @@ CELL_CLASS = str. Name of the annotation class being split.
     resolveHierarchy()
     
     def anno_collection = getAnnotationObjects().findAll{it.getPathClass() == getPathClass(CELL_CLASS)}
-    no_child_collection = anno_collection.findAll{!it.hasChildren()}
+    no_child_collection = anno_collection.findAll{!it.hasChildObjects()}
     removeObjects(no_child_collection)
-    
-    
-    // Make the detections into new cells    
-    for (nucleus in nuc_detections) {
-        nucleus_geom = nucleus.getROI().getGeometry()
+        
+      
+    // Make the detections into new cells. Remove any without parents (can arise from Voronoi artefacts occasionally)
+    for (nucleus in nuc_detections) {        
+                
         parent_anno = nucleus.getParent()
-        cytoplasm_geom = parent_anno.getROI().getGeometry().union(nucleus_geom)  // Modify the cytoplasm geom to ensure it fully contains its associated nucleus
-        cytoplasm_ROI = GeometryTools.geometryToROI(cytoplasm_geom, plane)
-            
-        cell = PathObjects.createCellObject(cytoplasm_ROI, nucleus.getROI(), getPathClass(CELL_CLASS)) //Set cell nucleus, cytoplasm and parent        
-        addObjects(cell)
-        removeObjects(nucleus)
-        removeObjects(parent_anno)
+        
+        if (parent_anno.getPathClass() == getPathClass(CELL_CLASS)){
+            nucleus_geom = nucleus.getROI().getGeometry()
+            cytoplasm_geom = parent_anno.getROI().getGeometry().union(nucleus_geom)  // Modify the cytoplasm geom to ensure it fully contains its associated nucleus
+            cytoplasm_ROI = GeometryTools.geometryToROI(cytoplasm_geom, plane)
+                
+            cell = PathObjects.createCellObject(cytoplasm_ROI, nucleus.getROI(), getPathClass(CELL_CLASS)) //Set cell nucleus, cytoplasm and parent        
+            addObjects(cell)
+            removeObjects(nucleus)
+            removeObjects(parent_anno)
+            } else {
+                removeObjects(nucleus)    
+            }
         }
     }
 
