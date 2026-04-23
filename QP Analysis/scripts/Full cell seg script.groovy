@@ -25,6 +25,10 @@ def GFAP_MASK = "GFAP- Astrocyte"  // String name of the GFAP annotations genera
 def OVERLAP_THRESHOLD = 20  // Minimum % area for nucleus to overlap with cell mask and be included 
 def CIRCULARITY_THRESHOLD = 0.5 // Minumum nuclear circularity
 
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// NB. To only restrict analysis to a user-defined ROI draw the necessary annotation and classify as "ROI" //
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ////////////////////////////////////////////////////////////////
 
 
@@ -42,8 +46,19 @@ import qupath.lib.roi.GeometryTools
 
 ////////// STEP 1 - NUCLEAR SEG/////////////////////////////////
 
-removeObjects(getAllObjects()) // clear objects
-createFullImageAnnotation(true) //make whole image annotaiton
+ROI_objects = getAllObjects().findAll{it.getPathClass() == getPathClass("ROI")}  // get any user-defined ROI annotations
+non_ROI_objects = getAllObjects().findAll{it.getPathClass() != getPathClass("ROI")}  
+
+if (ROI_objects.size() > 0) {    
+    selectObjectsByClassification("ROI")
+    mergeSelectedAnnotations()
+    removeObjects(non_ROI_objects)
+} else {    // If no "ROI" annotations exist, remove everything and make a whiole image annotation to work in
+    removeObjects(getAllObjects()) // clear objects
+    createFullImageAnnotation(true) //make whole image annotaiton    
+}
+
+
 frame_obj = getAnnotationObjects()[0]
     
 // Segment nuclei with Cellpose
