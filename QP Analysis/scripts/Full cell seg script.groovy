@@ -296,3 +296,5 @@ getCellObjects().each{cell ->
     }
 
 resetSelection()
+
+println getCurrentImageName().toString() + " processing complete"
