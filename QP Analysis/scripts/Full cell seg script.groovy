@@ -182,6 +182,12 @@ CELL_CLASS = str. Name of the annotation class being split.
 '''
 
     selectObjectsByClassification(CELL_CLASS)
+    
+    // Abort if there is no mask to split
+    if (getSelectedObjects().size()==0) {
+       return "No annotations classified as '" + CELL_CLASS + "'. Aborting Voronoi separation" 
+       }
+    
     mergeSelectedAnnotations()    
     resolveHierarchy() 
     cell_mask = getAnnotationObjects().findAll {it.getPathClass() == getPathClass(CELL_CLASS)}
