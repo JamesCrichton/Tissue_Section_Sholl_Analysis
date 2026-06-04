@@ -189,21 +189,26 @@ CELL_CLASS = str. Name of the annotation class being split.
     
     // Segment cell body using Voronoi
     /*Script to create Voronoi Diagrams from annotations and limit the expansion to a reference Annotation.
-     * This script also counts the number of touching neighbors and puts this value into the Voronoi annotations measurements. 
-     * @author Isaac Vieco-Martí
+     * Based on code by * @author Isaac Vieco-Martí
      */
     
-    // select detections (nuclei) to make Voronoi Diagram
-    def nuc_detections = getDetectionObjects().findAll{it.getParent().getPathClass() == getPathClass(CELL_CLASS)}
-    
+   
     // annotation to limit the expansion
     def reference = getAnnotationObjects().findAll {it.getPathClass() == getPathClass(CELL_CLASS)}
     def referenceGeom = reference[0].getROI().getGeometry()
     def plane = reference[0].getROI().getImagePlane()
     
+    // select detections (nuclei) to make Voronoi Diagram
+    def nuc_detections = getDetectionObjects().findAll{it.getParent().getPathClass() == getPathClass(CELL_CLASS)}
+    def eroded_nuclei = nuc_detections.collect{nuc->
+            eroded_geom = nuc.getROI().getGeometry().buffer(-1)
+            eroded_roi = GeometryTools.geometryToROI(eroded_geom, plane)
+            PathObjects.createAnnotationObject(eroded_roi, getPathClass(CELL_CLASS))
+    }
+    
     
     // Get the Voronoi Faces, it is a map with the original annotation and the geometry of the Voronoi Polygon
-    def voronoiDiagram = DelaunayTools.createFromGeometryCoordinates(nuc_detections,false,4.0).getVoronoiFaces()
+    def voronoiDiagram = DelaunayTools.createFromGeometryCoordinates(eroded_nuclei,false,4.0).getVoronoiFaces()
     
     // Create Voronoi annotations, limit the expansion and set the class of its origin annotation
     voronoiDiagram = voronoiDiagram.collectEntries { annotationObj, voronoiFace ->
